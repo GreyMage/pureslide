@@ -1,0 +1,4 @@
+pureslide
+=========
+
+jquery-based slideshow.
