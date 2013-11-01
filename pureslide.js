@@ -1,6 +1,6 @@
 /**
  * @author Eric Cutler
- * v. 1.1
+ * v. 1.2
  */
 jQuery.fn.pureslide = function(options) {
 	
@@ -11,7 +11,11 @@ jQuery.fn.pureslide = function(options) {
 		images: [],
 		prevArrow: 'go-previous.png',
 		nextArrow: 'go-next.png',
+		allowSlide:true,
+		allowDrag:true,
+		dragTolerance:100,
 		autoMillis: 0,
+		fitparent: false,
 		stopAutoOnClick: false,
 		pauseAutoOnHover: false
 	}, options );
@@ -19,11 +23,19 @@ jQuery.fn.pureslide = function(options) {
 	return this.each(function(){
 		var mySlide = {}
 		mySlide.images = [];
+		
 		for(var x in settings.images){ // Parse em.
-			mySlide.images.push($(settings.images[x]));
+			var t = $(settings.images[x]);
+			mySlide.images.push(t);
 		}
-
+		
 		mySlide.wrap = $(this);
+
+		if(settings.fitparent){
+			settings.maxY = mySlide.wrap.parent().height();
+			settings.maxX = mySlide.wrap.parent().width();
+		}
+		
 		mySlide.root = $('<div/>').addClass('inner').appendTo(mySlide.wrap);
 		mySlide.prevButton = $('<div/>').addClass('prevBtn').appendTo(mySlide.wrap);
 		mySlide.nextButton = $('<div/>').addClass('nextBtn').appendTo(mySlide.wrap);
@@ -34,20 +46,15 @@ jQuery.fn.pureslide = function(options) {
 		mySlide.bigY = 0;
 		mySlide.maxY = settings.maxY;
 		mySlide.maxX = settings.maxX;
-
+		
 		// Discover max sizes.
 		for(i in mySlide.images){
 		
 			mySlide.images[i].cw = mySlide.images[i].attr("width");
 			mySlide.images[i].ch = mySlide.images[i].attr("height");
-			
-			console.log(mySlide.images[i].cw,mySlide.images[i].ch);
 		
 			if(mySlide.images[i].cw > mySlide.bigX) mySlide.bigX = mySlide.images[i].cw;
-			if(mySlide.images[i].ch > mySlide.bigY) {
-				mySlide.bigY = mySlide.images[i].ch;
-				console.log("setting bigY to "+mySlide.bigY+" from val "+mySlide.images[i].ch);
-			}
+			if(mySlide.images[i].ch > mySlide.bigY) mySlide.bigY = mySlide.images[i].ch;
 		}
 
 		// Adjust for scale
@@ -60,7 +67,7 @@ jQuery.fn.pureslide = function(options) {
 		){
 			mySlide.yScale = mySlide.maxY / mySlide.bigY;
 			mySlide.xScale = mySlide.maxX / mySlide.bigX;
-			if(mySlide.yScale == 0) {
+			/*if(mySlide.yScale == 0) {
 				mySlide.imgScale = mySlide.xScale;
 			} else if(mySlide.xScale == 0) {
 				mySlide.imgScale = mySlide.yScale;
@@ -70,9 +77,9 @@ jQuery.fn.pureslide = function(options) {
 				} else {
 					mySlide.imgScale = mySlide.yScale;
 				}
-			}
-			mySlide.bigX = Math.ceil(mySlide.bigX * mySlide.imgScale);
-			mySlide.bigY = Math.ceil(mySlide.bigY * mySlide.imgScale);
+			}*/
+			mySlide.bigX = Math.ceil(mySlide.bigX * mySlide.xScale);
+			mySlide.bigY = Math.ceil(mySlide.bigY * mySlide.yScale);
 		}
 
 		// Create Frames
@@ -80,7 +87,11 @@ jQuery.fn.pureslide = function(options) {
 			var x = $('<div/>').addClass("frame");
 			mySlide.frames.push(x);
 			//mySlide.images[i].appendTo(x);
-			x.css("background-image","url("+mySlide.images[i].attr("src")+")");
+			x.css("background-image","url("+mySlide.images[i].attr("src")+")").css({
+				backgroundPosition: "center center",
+				backgroundRepeat: "no-repeat",
+				float: "left"
+			});
 			
 			// v3 Works for any image, does not resize ones smaller than the frame.
 			if(mySlide.images[i].cw > mySlide.bigX || mySlide.images[i].ch > mySlide.bigY){
@@ -181,6 +192,69 @@ jQuery.fn.pureslide = function(options) {
 				clearInterval(mySlide.autoProgress);
 			}
 		});
+		
+		if(settings.allowSlide){
+		
+			mySlide.drag = {}
+			mySlide.drag.start = function(x){
+				mySlide.drag.dragging = true;
+				mySlide.drag.initX = x;
+				return this;
+			}
+			mySlide.drag.move = function(x){
+				return this;
+			}
+			mySlide.drag.stop = function(x){
+				if(mySlide.drag.dragging){
+					mySlide.drag.dragging = false;
+					if(Math.abs(x-mySlide.drag.initX) > settings.dragTolerance){
+						if(x < mySlide.drag.initX){
+							mySlide.showNext();
+						} else {
+							mySlide.showPrev();
+						}
+						if(settings.stopAutoOnClick){
+							clearInterval(mySlide.autoProgress);
+						}
+					}
+				}
+				return this;
+			}
+		
+			mySlide.root.on({ 'touchstart mousedown ' : function(e){ 
+				var X = 0;
+				if(e.type == "mousedown"){
+					X = e.clientX;
+				} else if(e.type == "touchstart"){
+					X = e.originalEvent.touches[0].pageX;
+				}	
+				mySlide.drag.start(X);
+				return false;
+			}});
+			
+			mySlide.root.on({ 'touchmove mousemove ' : function(e){ 
+				
+				var X = 0;
+				if(e.type == "mousemove"){
+					X = e.clientX;
+				} else if(e.type == "touchmove"){
+					X = e.originalEvent.changedTouches[0].pageX;
+				}			
+				mySlide.drag.move(X);
+				return false;
+			}});
+			
+			$(window).on({ 'touchstop mouseup ' : function(e){ 		
+				var X = 0;
+				if(e.type == "mouseup"){
+					X = e.clientX;
+				} else if(e.type == "touchstop"){
+					X = e.originalEvent.changedTouches[0].pageX;
+				}				
+				mySlide.drag.stop(X);
+				return false;
+			}});
+		}
 
 		$(mySlide.frames).each(function(){
 			$(this).width(mySlide.bigX).height(mySlide.bigY);
@@ -191,6 +265,7 @@ jQuery.fn.pureslide = function(options) {
 			position: "relative"
 		});
 		mySlide.root.width(mySlide.bigX * mySlide.images.length);
+		mySlide.root.css("position","relative");
 		mySlide.root.children().first().show();
 		mySlide.ready();
 		
@@ -207,7 +282,5 @@ jQuery.fn.pureslide = function(options) {
 				if(!mySlide.autoPause) mySlide.showNext();
 			},settings.autoMillis);
 		}
-		
-		console.log(mySlide);
 	});
 }
