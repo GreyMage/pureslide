@@ -36,6 +36,10 @@ maxX and maxY
 -------------
 
 The maximum size the slideshow will size to, regardless of the size of any inner images. 0 default, 0 disable.
+fitparent
+-------------
+
+Force the maxX and maxY values to fit the parent element of the slideshow. defaults to false.
 prevArrow and nextArrow
 -------------
 
